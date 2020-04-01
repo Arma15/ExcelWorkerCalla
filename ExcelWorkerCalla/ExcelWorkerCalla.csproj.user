@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <StartArguments>"C:\Users\kflor\OneDrive\Desktop\Archive\Reports\20200319_Group1_Stage1" "C:\Users\kflor\OneDrive\Desktop\Archive\Reports\WorkOrder Report Template.xlsx" "0012B"</StartArguments>
+    <StartArguments>"C:\Users\kflor\OneDrive\Desktop\Streamline\Parts\Golf Ball\Temp\20200401_123025_Input_Scan_Data" "0012B"</StartArguments>
   </PropertyGroup>
 </Project>

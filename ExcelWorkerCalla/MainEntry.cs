@@ -4,8 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 [assembly: log4net.Config.XmlConfigurator(Watch = true)]
 
@@ -14,35 +12,46 @@ namespace ExcelWorkerCalla
     class MainEntry
     {
         private static readonly ILog _log = LogManager.GetLogger("ExcelWorkerCalla.log");
-        public static List<string> geoNumbers = new List<string>();
-        public static Group currGroup = new Group();
+        private static List<string> _groupNumbers = new List<string>();
+        private static Group _currGroup = new Group();
+        private static List<string> _controls = new List<string>();
+        private static string _baseLine = "";
 
+        // Info for use from filename
+        private static string[] _info;
+        // Given a path to a list of ball excel files (param 1)
+        private static string _inputFilePath;
+        // Given work order number (param 2)
+        private static string _workOrderNumber;
+        // Path to the workorder excel file template
+        private static string _excelPath;
+        // Finish stage
+        private static string _finishStage;
         static void Main(string[] args)
         {
-            // Given a path to a list of ball excel files (param 1)
-            string ballPath = @"C:\Users\kflor\OneDrive\Desktop\Archive\Reports\20200319_Group1_Stage1";
-            // Given path to the report template to be copied to desired location (param 2)
-            string excelPath = @"C:\Users\kflor\OneDrive\Desktop\Archive\Reports\WorkOrder Report Template.xlsx";
-            // Given work order number (param 3)
-            string workOrderNumber = "0012B";
-
+            _log.Info("Starting executable...");
             for (int i = 0; i < args.Length; ++i)
             {
                 _log.Info($"Param #{i + 1}: {args[i]}");
             }
 
-            if (args.Length < 3)
+            if (args.Length < 2)
             {
-                _log.Error($"Only {args.Length} arguments passed in, expecting 3 parameters");
+                _log.Error($"Only {args.Length} arguments passed in, expecting 2 parameters");
                 // return;
             }
 
             if (args.Length != 0)
             {
-                ballPath = args[0];
-                excelPath = args[1];
-                workOrderNumber = args[2];
+                _inputFilePath = args[0];
+                _workOrderNumber = args[1];
             }
+
+            // Get directories needed
+            string tempFolder = Path.GetDirectoryName(_inputFilePath);
+            string golfBallFolder = Path.GetDirectoryName(tempFolder);
+            string reportsFolder = golfBallFolder + "\\Reports";
+            _excelPath = golfBallFolder + "\\Archive\\WorkOrder Report Template.xlsx";
 
             #region Removed Code
             /*
@@ -52,56 +61,63 @@ namespace ExcelWorkerCalla
             */
             #endregion
             // Validate both directories
-            if (!Directory.Exists(ballPath))
+            if (!File.Exists(_inputFilePath))
             {
-                _log.Error($"Invalid directory {ballPath}");
+                _log.Error($"Invalid directory {_inputFilePath}");
                 return;
             }
 
-            if (!File.Exists(excelPath))
+            if (!Directory.Exists(golfBallFolder))
             {
-                _log.Error($"Invalid path {excelPath}");
+                _log.Error($"Invalid path {golfBallFolder}");
                 return;
             }
-
-            // Get reports folder path
-            string reportsFolderDir = Path.GetDirectoryName(ballPath);
 
             // Check if directory exists
-            if (!Directory.Exists(reportsFolderDir))
+            if (!Directory.Exists(reportsFolder))
             {
-                _log.Error($"Directory: {reportsFolderDir} does not exist.");
+                _log.Error($"Directory: {reportsFolder} does not exist.");
             }
             
             // Get Work Order reports path
-            string workOrderFolder = reportsFolderDir + "\\02_WorkOrder Reports";
+            string workOrderFolder = reportsFolder + "\\02_WorkOrder Reports";
 
             // Check if the work order folder exists
             if (!Directory.Exists(workOrderFolder))
             {
                 _log.Error($"Directory: {workOrderFolder} does not exist, creating it now...");
-                Directory.CreateDirectory(workOrderFolder);
-            }
-
-            // Copy template to workOrderFolder and rename it
-            // Get aspects of file name, 0 = date, 1 = time, 2 = group#, 3 = stage#
-            string[] info = Path.GetFileName(ballPath).Split('_');
-            string newReportFilePath = workOrderFolder + "\\" + info[0] + "_" + info[1] + "_" + workOrderNumber + "_Report.xlsm";
-            try
-            {
-                File.Copy(excelPath, newReportFilePath);
-            }
-            catch (Exception ex)
-            {
-                _log.Error($"Error when copying template file: {ex.Message.ToString()}");
                 return;
             }
 
-            // Now can write to new report file: newReportFilePath
-
+            // Copy template to workOrderFolder and rename it
+            // Get aspects of file name, 0 = date, 1 = time
+            _info = Path.GetFileName(_inputFilePath).Split('_');
+            string newReportFilePath = workOrderFolder + "\\" + _info[0] + "_" + _info[1] + "_" + _workOrderNumber + "_Report.xlsm";
             try
             {
-                DirectoryInfo direct = new DirectoryInfo(ballPath);
+                File.Copy(_excelPath, newReportFilePath);
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"Error when copying work order template file to new location: {newReportFilePath}, error message: {ex.Message.ToString()}");
+                return;
+            }
+
+            // Create a new Excel package from the file
+            FileInfo fi = new FileInfo(newReportFilePath);
+
+            // Parse input file for needed info like potential group numbers, controls _controls and the baseline _baseLine used
+            ParseInputFile(fi);
+
+            // Now we have a list of group numbers _groupNumbers, controls and a baseline
+            // Need to search the report folder for all related group sub folders with .xlsx data files to read from
+            // Make a list of folders to parse
+
+
+            // 
+            try
+            {
+                DirectoryInfo direct = new DirectoryInfo(_inputFilePath);
                 FileInfo[] files = direct.GetFiles("*.xlsx");
                 ReadData(files);
             }
@@ -109,25 +125,11 @@ namespace ExcelWorkerCalla
             {
                 _log.Error($"Exception thrown : {ex.Message.ToString()}");
             }
-            
-            // **************** Test code **********************************
-            using (StreamWriter sw = new StreamWriter(@"C:\Users\kflor\OneDrive\Desktop\Averages.txt"))
-            {
-                // Enter required data to textfile
-                foreach (Ball ball in currGroup.balls)
-                {
-                    sw.Write(ball.ToString());
-                    sw.WriteLine();
-                }
-            }
-            // **************** End test code ******************************
 
-            // Grab averages from every geometry
-            // AveGeometryFields(string geoNumber)
+
+
 
             // Open excel template file
-            // Create a new Excel package from the file
-            FileInfo fi = new FileInfo(newReportFilePath);
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             using (ExcelPackage excelDoc = new ExcelPackage(fi))
             {
@@ -141,7 +143,7 @@ namespace ExcelWorkerCalla
                 {
                     ++counter;
                 }
-                firstWorksheet.Cells[counter, 2].Value = currGroup.balls[0].GroupNumber;
+                firstWorksheet.Cells[counter, 2].Value = _currGroup.balls[0].GroupNumber;
                 // Find line to start entering geometry info
                 while (firstWorksheet.Cells[counter, 1].Value == null || !firstWorksheet.Cells[counter, 1].Value.ToString().ToLower().Contains("geometry"))
                 {
@@ -194,7 +196,7 @@ namespace ExcelWorkerCalla
                 for (int index = 0; index < 30; ++index)
                 {
                     string currGeo = firstWorksheet.Cells[counter, 1].Value.ToString();
-                    double[] geoFieldsAverages = currGroup.AveGeometryFields(currGeo);
+                    double[] geoFieldsAverages = _currGroup.AveGeometryFields(currGeo);
 
                     #region Removed code
                     /*
@@ -347,6 +349,112 @@ namespace ExcelWorkerCalla
                 catch (Exception ex)
                 {
                     _log.Error($"Exception when saving excel document: {ex.Message.ToString()}");
+                }
+            }
+
+            #region Test Code
+            // **************** Test code **********************************
+            using (StreamWriter sw = new StreamWriter(@"C:\Users\kflor\OneDrive\Desktop\Averages.txt"))
+            {
+                // Enter required data to textfile
+                foreach (Ball ball in _currGroup.balls)
+                {
+                    sw.Write(ball.ToString());
+                    sw.WriteLine();
+                }
+            }
+            // **************** End test code ******************************
+            #endregion
+        }
+
+        private static void ParseInputFile(FileInfo file)
+        {
+            // Create a new Excel package from the file
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            using (ExcelPackage excelDoc = new ExcelPackage(file))
+            {
+                // _groupNumbers
+                // Get first worksheet to grab data from
+                ExcelWorksheet rackOneAndTwo = excelDoc.Workbook.Worksheets[1];
+
+                // Rack 1
+                AnalyzeSection(rackOneAndTwo, 3, 1, 10, 3);
+                AnalyzeSection(rackOneAndTwo, 3, 7, 10, 9);
+                AnalyzeSection(rackOneAndTwo, 3, 13, 10, 15);
+                AnalyzeSection(rackOneAndTwo, 3, 19, 10, 21);
+                AnalyzeSection(rackOneAndTwo, 3, 25, 10, 27);
+                AnalyzeSection(rackOneAndTwo, 3, 31, 10, 33);
+                AnalyzeSection(rackOneAndTwo, 3, 37, 10, 39);
+                AnalyzeSection(rackOneAndTwo, 3, 43, 10, 45);
+                AnalyzeSection(rackOneAndTwo, 3, 49, 10, 51);
+                AnalyzeSection(rackOneAndTwo, 3, 55, 10, 57);
+
+                // Rack 2
+                AnalyzeSection(rackOneAndTwo, 26, 1, 33, 3);
+                AnalyzeSection(rackOneAndTwo, 26, 7, 33, 9);
+                AnalyzeSection(rackOneAndTwo, 26, 13, 33, 15);
+                AnalyzeSection(rackOneAndTwo, 26, 19, 33, 21);
+                AnalyzeSection(rackOneAndTwo, 26, 25, 33, 27);
+                AnalyzeSection(rackOneAndTwo, 26, 31, 33, 33);
+                AnalyzeSection(rackOneAndTwo, 26, 37, 33, 39);
+                AnalyzeSection(rackOneAndTwo, 26, 43, 33, 45);
+                AnalyzeSection(rackOneAndTwo, 26, 49, 33, 51);
+                AnalyzeSection(rackOneAndTwo, 26, 55, 33, 57);
+
+            }
+        }
+
+        /* Need: 
+                 * 1 - WO# Top start position (Row/Col) ex. 3,1
+                 * 2 - Group# start (Row/Col) ex. 10,3 
+        */
+        private static void AnalyzeSection(ExcelWorksheet rackOneAndTwo, int wOTopStartRow, int wOTopStartCol, int groupStartRow, int groupStartCol)
+        {
+            // Rack 1, Row 1, designed  to loop through the 4 possible rows with WO#, baseline/CAD, and controls
+            for (int i = 0; i < 4; ++i)
+            {
+                // Check WO #s at top each row, maximum of 4 and only read if there is a value and it matches the current work order
+                if (rackOneAndTwo.Cells[i + wOTopStartRow, wOTopStartCol].Value != null && rackOneAndTwo.Cells[i + wOTopStartRow, wOTopStartCol].Value.ToString() == _workOrderNumber)
+                {
+                    // Add CAD and controls listed for that WO number
+                    if (_baseLine == "")
+                    {
+                        // Baseline is always first before the controls
+                        _baseLine = rackOneAndTwo.Cells[i + wOTopStartRow, wOTopStartCol + 1].Value.ToString();
+                    }
+
+                    // Add controls if they are not added yet, up to 3 controls per row
+                    for (int count = wOTopStartCol + 2; count < wOTopStartCol + 5; ++count)
+                    {
+                        // Check each colum for the remainder of the controls if value is not null
+                        if (rackOneAndTwo.Cells[i + wOTopStartRow, count].Value != null && !_controls.Contains(rackOneAndTwo.Cells[i + wOTopStartRow, count].Value.ToString()))
+                        {
+                            // If does not exist in the list then add it
+                            _controls.Add(rackOneAndTwo.Cells[i + wOTopStartRow, count].Value.ToString());
+                        }
+                    }
+
+                    // Loop through cells to grab group numbers involved, max number of 10 per row
+                    for (int j = 0; j < 10; ++j)
+                    {
+                        // Check the WO#, if it matches then add the group number in the column before it
+                        if (rackOneAndTwo.Cells[i + groupStartRow, groupStartCol + 1].Value != null && rackOneAndTwo.Cells[i + groupStartRow, groupStartCol + 1].Value.ToString() == _workOrderNumber)
+                        {
+                            if (rackOneAndTwo.Cells[i + groupStartRow, groupStartCol].Value == null)
+                            {
+                                _log.Error($"No Value found in input sheet at position {i + groupStartRow}, {groupStartCol} where there is a value for WO# in the next cell.");
+                                return;
+                            }
+                            // First part of split holds group number, second is ball number
+                            string grpNum = rackOneAndTwo.Cells[i + groupStartRow, groupStartCol].Value.ToString().Split('_')[0];
+
+                            // Add it if it is not already in the list
+                            if (!_groupNumbers.Contains(grpNum))
+                            {
+                                _groupNumbers.Add(grpNum);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -534,7 +642,7 @@ namespace ExcelWorkerCalla
                     }
                 }
                 // Add ball after filling data fields
-                currGroup.Add(currBall);
+                _currGroup.Add(currBall);
             }
         }
     }
