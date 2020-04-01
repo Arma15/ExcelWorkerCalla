@@ -13,8 +13,8 @@ namespace ExcelWorkerCalla
     {
         private static readonly ILog _log = LogManager.GetLogger("ExcelWorkerCalla.log");
         private static List<string> _groupNumbers = new List<string>();
-        private static Group _currGroup = new Group();
-        private static List<string> _controls = new List<string>();
+        private static List<Group> _allGroups = new List<Group>();
+        private static List<string> _controls = new List<string>(); 
         private static string _baseLine = "";
 
         // Info for use from filename
@@ -85,7 +85,7 @@ namespace ExcelWorkerCalla
             // Check if the work order folder exists
             if (!Directory.Exists(workOrderFolder))
             {
-                _log.Error($"Directory: {workOrderFolder} does not exist, creating it now...");
+                _log.Error($"Directory: {workOrderFolder} does not exist...");
                 return;
             }
 
@@ -104,35 +104,91 @@ namespace ExcelWorkerCalla
             }
 
             // Create a new Excel package from the file
-            FileInfo fi = new FileInfo(newReportFilePath);
+            FileInfo inputFiles = new FileInfo(_inputFilePath);
 
             // Parse input file for needed info like potential group numbers, controls _controls and the baseline _baseLine used
-            ParseInputFile(fi);
-
+            ParseInputFile(inputFiles);
             // Now we have a list of group numbers _groupNumbers, controls and a baseline
+
             // Need to search the report folder for all related group sub folders with .xlsx data files to read from
-            // Make a list of folders to parse
+            List<string> groupFolderPaths = new List<string>();
 
+            // Make a list of folders to parse 
+            string[] allFolders = Directory.GetDirectories(reportsFolder);
 
-            // 
-            try
+            // If a folder name includes a group number we want then parse it
+            foreach (string folderPath in allFolders)
             {
-                DirectoryInfo direct = new DirectoryInfo(_inputFilePath);
-                FileInfo[] files = direct.GetFiles("*.xlsx");
-                ReadData(files);
+                string folder = Path.GetFileName(folderPath);
+                string date = folder.Split('_')[0];
+                if (date != _info[0])
+                {
+                    continue;
+                }
+
+                string time = folder.Split('_')[1];
+                if (time != _info[1])
+                {
+                    continue;
+                }
+
+                string grpNum = folder.Split('_')[2];
+                if (grpNum != null && _groupNumbers.Contains(grpNum))
+                {
+                    groupFolderPaths.Add(folderPath);
+                }
             }
-            catch (Exception ex)
+
+            // Now we have paths to each group folder that we need to record
+            // Should have equal number of folder paths and group numbers listed, so check
+            if (groupFolderPaths.Count != _groupNumbers.Count)
             {
-                _log.Error($"Exception thrown : {ex.Message.ToString()}");
+                _log.Error($"Number of group numbers in folder hierarchy({groupFolderPaths.Count}) does not match quantity found in input file({_groupNumbers.Count}) {Environment.NewLine}for Work Order number: {_workOrderNumber}..");
             }
 
-
-
+            // Loop through all relevant folders full of ball data
+            foreach (string groupFolder in groupFolderPaths)
+            {
+                string currGrpNumber = Path.GetFileName(groupFolder).Split('_')[2];
+                try
+                {
+                    DirectoryInfo direct = new DirectoryInfo(groupFolder);
+                    FileInfo[] files = direct.GetFiles("*.xlsx");
+                    _allGroups.Add(ReadData(files, currGrpNumber));
+                }
+                catch (Exception ex)
+                {
+                    _log.Error($"Exception thrown when looping through ball files and directories: {ex.Message.ToString()}");
+                }
+            }
+            
+            // Create a new Excel package from the copied excel file
+            FileInfo fi = new FileInfo(newReportFilePath);
 
             // Open excel template file
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             using (ExcelPackage excelDoc = new ExcelPackage(fi))
             {
+                // Create Control sheets first
+                foreach (string ctrl in _controls)
+                {
+                    excelDoc.Workbook.Worksheets.Copy("Baseline", ctrl);
+                }
+
+                // Create new sheet named : group inside excel report for each group in _groupNumbers
+                foreach (string grp in _groupNumbers)
+                {
+                    excelDoc.Workbook.Worksheets.Copy("Group", grp);
+                }
+
+                // Remove generic group sheet
+                excelDoc.Workbook.Worksheets.Delete("Group");
+
+
+
+
+
+
                 // open sheet with group number as the name
                 //Get first WorkSheet. Note that EPPlus indexes start at 1!
                 ExcelWorksheet firstWorksheet = excelDoc.Workbook.Worksheets["Group2"];
@@ -193,7 +249,7 @@ namespace ExcelWorkerCalla
                 #endregion
 
                 // Save values to their cells
-                for (int index = 0; index < 30; ++index)
+                for (int index = 0; index < 30; ++index, ++counter)
                 {
                     string currGeo = firstWorksheet.Cells[counter, 1].Value.ToString();
                     double[] geoFieldsAverages = _currGroup.AveGeometryFields(currGeo);
@@ -262,7 +318,6 @@ namespace ExcelWorkerCalla
                         }*/
                         #endregion
                     }
-                    ++counter;
                 }
 
                 #region Removed Code
@@ -459,29 +514,10 @@ namespace ExcelWorkerCalla
             }
         }
 
-        #region STD Calculator
-        private static double CalculateStandardDeviation(IEnumerable<double> values)
+        // Read the files passed in to compile the group data in report sheet
+        private static Group ReadData(FileInfo[] files, string grpnum)
         {
-            double standardDeviation = 0;
-
-            if (values.Any())
-            {
-                // Compute the average.     
-                double avg = values.Average();
-
-                // Perform the Sum of (value-avg)_2_2.      
-                double sum = values.Sum(d => Math.Pow(d - avg, 2));
-
-                // Put it all together.      
-                standardDeviation = Math.Sqrt((sum) / (values.Count() - 1));
-            }
-
-            return standardDeviation;
-        }
-        #endregion
-
-        private static void ReadData(FileInfo[] files)
-        {
+            Group currGroup = new Group(grpnum);
             // Each file will be a separate ball
             foreach (FileInfo fi in files)
             {
@@ -642,8 +678,31 @@ namespace ExcelWorkerCalla
                     }
                 }
                 // Add ball after filling data fields
-                _currGroup.Add(currBall);
+                currGroup.Add(currBall);
             }
+            return currGroup;
         }
+
+        #region STD Calculator
+        private static double CalculateStandardDeviation(IEnumerable<double> values)
+        {
+            double standardDeviation = 0;
+
+            if (values.Any())
+            {
+                // Compute the average.     
+                double avg = values.Average();
+
+                // Perform the Sum of (value-avg)_2_2.      
+                double sum = values.Sum(d => Math.Pow(d - avg, 2));
+
+                // Put it all together.      
+                standardDeviation = Math.Sqrt((sum) / (values.Count() - 1));
+            }
+
+            return standardDeviation;
+        }
+        #endregion
+
     }
 }
