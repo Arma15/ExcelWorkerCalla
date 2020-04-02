@@ -184,139 +184,155 @@ namespace ExcelWorkerCalla
                 // Remove generic group sheet
                 excelDoc.Workbook.Worksheets.Delete("Group");
 
-
-
-
-
-
-                // open sheet with group number as the name
-                //Get first WorkSheet. Note that EPPlus indexes start at 1!
-                ExcelWorksheet firstWorksheet = excelDoc.Workbook.Worksheets["Group2"];
-
-                // Find line to insert group number on
-                int counter = 1;
-                while (firstWorksheet.Cells[counter, 1].Value == null || !firstWorksheet.Cells[counter, 1].Value.ToString().ToLower().Contains("group"))
+                // Loop through all groups and fill the data accordingly
+                for (int i = 0; i < _groupNumbers.Count; ++i)
                 {
-                    ++counter;
-                }
-                firstWorksheet.Cells[counter, 2].Value = _currGroup.balls[0].GroupNumber;
-                // Find line to start entering geometry info
-                while (firstWorksheet.Cells[counter, 1].Value == null || !firstWorksheet.Cells[counter, 1].Value.ToString().ToLower().Contains("geometry"))
-                {
-                    ++counter;
-                }
-                // Move to first geometry line
-                ++counter;
-                #region Removed Code
-                /*
-                // Make some lists to hold the averages of each field for getting the std
-                List<double> listHeightAve = new List<double>();
-                List<double> listWidthtAve = new List<double>();
-                List<double> listTotalAreaAve = new List<double>();
-                List<double> listAreaTopAve = new List<double>();
-                List<double> listFlatnessAve = new List<double>();
-                List<double> listMaxCurvatureAve = new List<double>();
-                List<double> listMaxSlopeAve = new List<double>();
-                List<double> listMaxSlopeXAve = new List<double>();
-                List<double> listMaxSlopeRAve = new List<double>();
-                List<double> listSlopeWidthAve = new List<double>();
-                List<double> listRecirculationAreaAve = new List<double>();
-
-                List<double> TopHeightAve = new List<double>();
-                List<double> TopWidthtAve = new List<double>();
-                List<double> TopTotalAreaAve = new List<double>();
-                List<double> TopAreaTopAve = new List<double>();
-                List<double> TopFlatnessAve = new List<double>();
-                List<double> TopMaxCurvatureAve = new List<double>();
-                List<double> TopMaxSlopeAve = new List<double>();
-                List<double> TopMaxSlopeXAve = new List<double>();
-                List<double> TopMaxSlopeRAve = new List<double>();
-                List<double> TopSlopeWidthAve = new List<double>();
-                List<double> TopRecirculationAreaAve = new List<double>();
-
-                List<double> BottomHeightAve = new List<double>();
-                List<double> BottomWidthtAve = new List<double>();
-                List<double> BottomTotalAreaAve = new List<double>();
-                List<double> BottomAreaTopAve = new List<double>();
-                List<double> BottomFlatnessAve = new List<double>();
-                List<double> BottomMaxCurvatureAve = new List<double>();
-                List<double> BottomMaxSlopeAve = new List<double>();
-                List<double> BottomMaxSlopeXAve = new List<double>();
-                List<double> BottomMaxSlopeRAve = new List<double>();
-                List<double> BottomSlopeWidthAve = new List<double>();
-                List<double> BottomRecirculationAreaAve = new List<double>();
-                */
-                #endregion
-
-                // Save values to their cells
-                for (int index = 0; index < 30; ++index, ++counter)
-                {
-                    string currGeo = firstWorksheet.Cells[counter, 1].Value.ToString();
-                    double[] geoFieldsAverages = _currGroup.AveGeometryFields(currGeo);
-
-                    #region Removed code
-                    /*
-                    // For all 30 tubes
-                    listHeightAve.Add(geoFieldsAverages[0]);
-                    listWidthtAve.Add(geoFieldsAverages[1]);
-                    listTotalAreaAve.Add(geoFieldsAverages[2]);
-                    listAreaTopAve.Add(geoFieldsAverages[3]);
-                    listFlatnessAve.Add(geoFieldsAverages[4]);
-                    listMaxCurvatureAve.Add(geoFieldsAverages[5]);
-                    listMaxSlopeAve.Add(geoFieldsAverages[6]);
-                    listMaxSlopeXAve.Add(geoFieldsAverages[7]);
-                    listMaxSlopeRAve.Add(geoFieldsAverages[8]);
-                    listSlopeWidthAve.Add(geoFieldsAverages[9]);
-                    listRecirculationAreaAve.Add(geoFieldsAverages[10]);
-
-                    if (index < 15)
+                    foreach (Group _currGroup in _allGroups)
                     {
-                        // For top tubes
-                        TopHeightAve.Add(geoFieldsAverages[0]);
-                        TopWidthtAve.Add(geoFieldsAverages[1]);
-                        TopTotalAreaAve.Add(geoFieldsAverages[2]);
-                        TopAreaTopAve.Add(geoFieldsAverages[3]);
-                        TopFlatnessAve.Add(geoFieldsAverages[4]);
-                        TopMaxCurvatureAve.Add(geoFieldsAverages[5]);
-                        TopMaxSlopeAve.Add(geoFieldsAverages[6]);
-                        TopMaxSlopeXAve.Add(geoFieldsAverages[7]);
-                        TopMaxSlopeRAve.Add(geoFieldsAverages[8]);
-                        TopSlopeWidthAve.Add(geoFieldsAverages[9]);
-                        TopRecirculationAreaAve.Add(geoFieldsAverages[10]);
-                    }
-                    else
-                    {
-                        // For bottom tubes
-                        BottomHeightAve.Add(geoFieldsAverages[0]);
-                        BottomWidthtAve.Add(geoFieldsAverages[1]);
-                        BottomTotalAreaAve.Add(geoFieldsAverages[2]);
-                        BottomAreaTopAve.Add(geoFieldsAverages[3]);
-                        BottomFlatnessAve.Add(geoFieldsAverages[4]);
-                        BottomMaxCurvatureAve.Add(geoFieldsAverages[5]);
-                        BottomMaxSlopeAve.Add(geoFieldsAverages[6]);
-                        BottomMaxSlopeXAve.Add(geoFieldsAverages[7]);
-                        BottomMaxSlopeRAve.Add(geoFieldsAverages[8]);
-                        BottomSlopeWidthAve.Add(geoFieldsAverages[9]);
-                        BottomRecirculationAreaAve.Add(geoFieldsAverages[10]);
-                    }
-                    */
-                    #endregion
-
-                    for (int i = 0, column = 6; i < geoFieldsAverages.Length; ++i, column += 2)
-                    {
-                        firstWorksheet.Cells[counter, column].Value = geoFieldsAverages[i];
-
-                        #region Removed Code
-                        /*ave30Tubes[i] += geoFieldsAverages[i];
-                        if (firstWorksheet.Cells[counter, 3].Value.ToString().ToLower() == "top")
+                        if (_currGroup.GroupNumber == _groupNumbers[i])
                         {
-                            aveTopTubes[i] += geoFieldsAverages[i];
+                            // open sheet with group number as the name
+                            //Get worksheet of that group number and write to it
+                            ExcelWorksheet currSheet = excelDoc.Workbook.Worksheets[_groupNumbers[i]];
+
+                            // Find line to insert group number on
+                            int counter = 1;
+                            while (currSheet.Cells[counter, 1].Value == null || !currSheet.Cells[counter, 1].Value.ToString().ToLower().Contains("group"))
+                            {
+                                ++counter;
+                            }
+
+                            // Write Info atop each group sheet
+                            currSheet.Cells[1, 1].Value = $"Ball Scan Report \n WO {_workOrderNumber}({_baseLine} - Baseline)";
+
+                            // Write group number on top of sheet
+                            currSheet.Cells[counter, 2].Value = _groupNumbers[i];
+
+                            // Write baseline/CAD number to top sheet
+                            currSheet.Cells[counter + 2, 2].Value = _baseLine;
+
+                            // Find line to start entering geometry info
+                            while (currSheet.Cells[counter, 1].Value == null || !currSheet.Cells[counter, 1].Value.ToString().ToLower().Contains("geometry"))
+                            {
+                                ++counter;
+                            }
+
+                            // Move to first geometry line
+                            ++counter;
+
+                            #region Removed Code
+                            /*
+                            // Make some lists to hold the averages of each field for getting the std
+                            List<double> listHeightAve = new List<double>();
+                            List<double> listWidthtAve = new List<double>();
+                            List<double> listTotalAreaAve = new List<double>();
+                            List<double> listAreaTopAve = new List<double>();
+                            List<double> listFlatnessAve = new List<double>();
+                            List<double> listMaxCurvatureAve = new List<double>();
+                            List<double> listMaxSlopeAve = new List<double>();
+                            List<double> listMaxSlopeXAve = new List<double>();
+                            List<double> listMaxSlopeRAve = new List<double>();
+                            List<double> listSlopeWidthAve = new List<double>();
+                            List<double> listRecirculationAreaAve = new List<double>();
+
+                            List<double> TopHeightAve = new List<double>();
+                            List<double> TopWidthtAve = new List<double>();
+                            List<double> TopTotalAreaAve = new List<double>();
+                            List<double> TopAreaTopAve = new List<double>();
+                            List<double> TopFlatnessAve = new List<double>();
+                            List<double> TopMaxCurvatureAve = new List<double>();
+                            List<double> TopMaxSlopeAve = new List<double>();
+                            List<double> TopMaxSlopeXAve = new List<double>();
+                            List<double> TopMaxSlopeRAve = new List<double>();
+                            List<double> TopSlopeWidthAve = new List<double>();
+                            List<double> TopRecirculationAreaAve = new List<double>();
+
+                            List<double> BottomHeightAve = new List<double>();
+                            List<double> BottomWidthtAve = new List<double>();
+                            List<double> BottomTotalAreaAve = new List<double>();
+                            List<double> BottomAreaTopAve = new List<double>();
+                            List<double> BottomFlatnessAve = new List<double>();
+                            List<double> BottomMaxCurvatureAve = new List<double>();
+                            List<double> BottomMaxSlopeAve = new List<double>();
+                            List<double> BottomMaxSlopeXAve = new List<double>();
+                            List<double> BottomMaxSlopeRAve = new List<double>();
+                            List<double> BottomSlopeWidthAve = new List<double>();
+                            List<double> BottomRecirculationAreaAve = new List<double>();
+                            */
+                            #endregion
+
+                            // Save values to their cells
+                            for (int index = 0; index < 30; ++index, ++counter)
+                            {
+                                string currGeo = currSheet.Cells[counter, 1].Value.ToString();
+                                double[] geoFieldsAverages = _currGroup.AveGeometryFields(currGeo);
+
+                                #region Removed code
+                                /*
+                                // For all 30 tubes
+                                listHeightAve.Add(geoFieldsAverages[0]);
+                                listWidthtAve.Add(geoFieldsAverages[1]);
+                                listTotalAreaAve.Add(geoFieldsAverages[2]);
+                                listAreaTopAve.Add(geoFieldsAverages[3]);
+                                listFlatnessAve.Add(geoFieldsAverages[4]);
+                                listMaxCurvatureAve.Add(geoFieldsAverages[5]);
+                                listMaxSlopeAve.Add(geoFieldsAverages[6]);
+                                listMaxSlopeXAve.Add(geoFieldsAverages[7]);
+                                listMaxSlopeRAve.Add(geoFieldsAverages[8]);
+                                listSlopeWidthAve.Add(geoFieldsAverages[9]);
+                                listRecirculationAreaAve.Add(geoFieldsAverages[10]);
+
+                                if (index < 15)
+                                {
+                                    // For top tubes
+                                    TopHeightAve.Add(geoFieldsAverages[0]);
+                                    TopWidthtAve.Add(geoFieldsAverages[1]);
+                                    TopTotalAreaAve.Add(geoFieldsAverages[2]);
+                                    TopAreaTopAve.Add(geoFieldsAverages[3]);
+                                    TopFlatnessAve.Add(geoFieldsAverages[4]);
+                                    TopMaxCurvatureAve.Add(geoFieldsAverages[5]);
+                                    TopMaxSlopeAve.Add(geoFieldsAverages[6]);
+                                    TopMaxSlopeXAve.Add(geoFieldsAverages[7]);
+                                    TopMaxSlopeRAve.Add(geoFieldsAverages[8]);
+                                    TopSlopeWidthAve.Add(geoFieldsAverages[9]);
+                                    TopRecirculationAreaAve.Add(geoFieldsAverages[10]);
+                                }
+                                else
+                                {
+                                    // For bottom tubes
+                                    BottomHeightAve.Add(geoFieldsAverages[0]);
+                                    BottomWidthtAve.Add(geoFieldsAverages[1]);
+                                    BottomTotalAreaAve.Add(geoFieldsAverages[2]);
+                                    BottomAreaTopAve.Add(geoFieldsAverages[3]);
+                                    BottomFlatnessAve.Add(geoFieldsAverages[4]);
+                                    BottomMaxCurvatureAve.Add(geoFieldsAverages[5]);
+                                    BottomMaxSlopeAve.Add(geoFieldsAverages[6]);
+                                    BottomMaxSlopeXAve.Add(geoFieldsAverages[7]);
+                                    BottomMaxSlopeRAve.Add(geoFieldsAverages[8]);
+                                    BottomSlopeWidthAve.Add(geoFieldsAverages[9]);
+                                    BottomRecirculationAreaAve.Add(geoFieldsAverages[10]);
+                                }
+                                */
+                                #endregion
+
+                                for (int ind = 0, column = 6; ind < geoFieldsAverages.Length; ++ind, column += 2)
+                                {
+                                    currSheet.Cells[counter, column].Value = geoFieldsAverages[ind];
+
+                                    #region Removed Code
+                                    /*ave30Tubes[i] += geoFieldsAverages[i];
+                                    if (firstWorksheet.Cells[counter, 3].Value.ToString().ToLower() == "top")
+                                    {
+                                        aveTopTubes[i] += geoFieldsAverages[i];
+                                    }
+                                    else if (firstWorksheet.Cells[counter, 3].Value.ToString().ToLower() == "bottom")
+                                    {
+                                        aveBottomTubes[i] += geoFieldsAverages[i];
+                                    }*/
+                                    #endregion
+                                }
+                            }
                         }
-                        else if (firstWorksheet.Cells[counter, 3].Value.ToString().ToLower() == "bottom")
-                        {
-                            aveBottomTubes[i] += geoFieldsAverages[i];
-                        }*/
-                        #endregion
                     }
                 }
 
@@ -396,6 +412,7 @@ namespace ExcelWorkerCalla
                 }
                 */
                 #endregion
+
                 // Save the changes
                 try
                 {
@@ -408,7 +425,7 @@ namespace ExcelWorkerCalla
             }
 
             #region Test Code
-            // **************** Test code **********************************
+/*            // **************** Test code **********************************
             using (StreamWriter sw = new StreamWriter(@"C:\Users\kflor\OneDrive\Desktop\Averages.txt"))
             {
                 // Enter required data to textfile
@@ -418,7 +435,7 @@ namespace ExcelWorkerCalla
                     sw.WriteLine();
                 }
             }
-            // **************** End test code ******************************
+            // **************** End test code *******************************/
             #endregion
         }
 
