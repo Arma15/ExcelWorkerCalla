@@ -20,11 +20,15 @@ namespace ExcelWorkerCalla
         // Info for use from filename
         private static string[] _info;
         // Given a path to a list of ball excel files (param 1)
-        private static string _inputFilePath;
+        private static string _inputFilePath = "";
+        // Ini file path
+        private static string _iniFilePath;
         // Given work order number (param 2)
-        private static string _workOrderNumber;
+        private static string _workOrderNumber = "";
         // Path to the workorder excel file template
-        private static string _excelPath;
+        private static string _excelReportPath;
+        // Path to controls template
+        private static string _controlsTemplate;
         // Finish stage
         private static string _finishStage;
         static void Main(string[] args)
@@ -35,31 +39,50 @@ namespace ExcelWorkerCalla
                 _log.Info($"Param #{i + 1}: {args[i]}");
             }
 
-            if (args.Length < 2)
+            if (args.Length < 1)
             {
-                _log.Error($"Only {args.Length} arguments passed in, expecting 2 parameters");
-                // return;
+                _log.Error($"{args.Length} arguments passed in, expecting a parameter");
+                return;
             }
 
             if (args.Length != 0)
             {
-                _inputFilePath = args[0];
-                _workOrderNumber = args[1];
+                _iniFilePath = args[0];
+            }
+
+            if (!File.Exists(_iniFilePath))
+            {
+                _log.Error($"Path to ini file incorrect, {_iniFilePath}");
+                return;
+            }
+
+            string[] lines = File.ReadAllLines(_iniFilePath);
+            foreach (string line in lines)
+            {
+                if (line.Split('=')[0] == "inputScanData")
+                {
+                    _inputFilePath = line.Split('=')[1];
+                }
+                if (line.Split('=')[0] == "workOrder")
+                {
+                    _workOrderNumber = line.Split('=')[1];
+                }
+            }
+            
+            if (_workOrderNumber == "")
+            {
+                _log.Error("Work order number not found in ini file..");
+                return;
             }
 
             // Get directories needed
             string tempFolder = Path.GetDirectoryName(_inputFilePath);
             string golfBallFolder = Path.GetDirectoryName(tempFolder);
             string reportsFolder = golfBallFolder + "\\Reports";
-            _excelPath = golfBallFolder + "\\Archive\\WorkOrder Report Template.xlsx";
+            string archiveFolder = golfBallFolder + "\\Archive";
+            _excelReportPath = archiveFolder + "\\WorkOrder Report Template.xlsx";
+            _controlsTemplate = archiveFolder + "\\Controls Template.xlsx";
 
-            #region Removed Code
-            /*
-            double[] ave30Tubes = new double[11];
-            double[] aveTopTubes = new double[11];
-            double[] aveBottomTubes = new double[11];
-            */
-            #endregion
             // Validate both directories
             if (!File.Exists(_inputFilePath))
             {
@@ -77,6 +100,7 @@ namespace ExcelWorkerCalla
             if (!Directory.Exists(reportsFolder))
             {
                 _log.Error($"Directory: {reportsFolder} does not exist.");
+                return;
             }
             
             // Get Work Order reports path
@@ -92,10 +116,10 @@ namespace ExcelWorkerCalla
             // Copy template to workOrderFolder and rename it
             // Get aspects of file name, 0 = date, 1 = time
             _info = Path.GetFileName(_inputFilePath).Split('_');
-            string newReportFilePath = workOrderFolder + "\\" + _info[0] + "_" + _info[1] + "_" + _workOrderNumber + "_Report.xlsm";
+            string newReportFilePath = workOrderFolder + "\\" + _info[0] + "_" + _info[1] + "_" + _workOrderNumber + "_Report.xlsx";
             try
             {
-                File.Copy(_excelPath, newReportFilePath);
+                File.Copy(_excelReportPath, newReportFilePath);
             }
             catch (Exception ex)
             {
@@ -159,6 +183,7 @@ namespace ExcelWorkerCalla
                 catch (Exception ex)
                 {
                     _log.Error($"Exception thrown when looping through ball files and directories: {ex.Message.ToString()}");
+                    return;
                 }
             }
             
@@ -169,10 +194,30 @@ namespace ExcelWorkerCalla
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             using (ExcelPackage excelDoc = new ExcelPackage(fi))
             {
-                // Create Control sheets first
-                foreach (string ctrl in _controls)
+                // Copy Baseline and Control sheets from template to this work order
+                using (ExcelPackage excelTemp = new ExcelPackage(new FileInfo(_controlsTemplate)))
                 {
-                    excelDoc.Workbook.Worksheets.Copy("Baseline", ctrl);
+                    // Check if the template worksheet has a baseline sheet, if not return
+                    if (excelTemp.Workbook.Worksheets.FirstOrDefault(x => x.Name == "Baseline") == null)
+                    {
+                        _log.Error($"Baseline worksheet does not exist in the controls template..");
+                        return;
+                    }
+                    // Add the baseline to the new workorder doc
+                    excelDoc.Workbook.Worksheets.Add("Baseline", excelTemp.Workbook.Worksheets["Baseline"]);
+                    // Add all the control sheets from template to new work order doc
+                    foreach (string sheetName in _controls)
+                    {
+                        if (excelTemp.Workbook.Worksheets.FirstOrDefault(x => x.Name == sheetName) == null)
+                        {
+                            _log.Error($"Worksheet {sheetName} does not exist in the controls template..");
+                            return;
+                        }
+                        else
+                        {
+                            excelDoc.Workbook.Worksheets.Add(sheetName, excelTemp.Workbook.Worksheets[sheetName]);
+                        }
+                    }
                 }
 
                 // Create new sheet named : group inside excel report for each group in _groupNumbers
@@ -220,198 +265,22 @@ namespace ExcelWorkerCalla
                             // Move to first geometry line
                             ++counter;
 
-                            #region Removed Code
-                            /*
-                            // Make some lists to hold the averages of each field for getting the std
-                            List<double> listHeightAve = new List<double>();
-                            List<double> listWidthtAve = new List<double>();
-                            List<double> listTotalAreaAve = new List<double>();
-                            List<double> listAreaTopAve = new List<double>();
-                            List<double> listFlatnessAve = new List<double>();
-                            List<double> listMaxCurvatureAve = new List<double>();
-                            List<double> listMaxSlopeAve = new List<double>();
-                            List<double> listMaxSlopeXAve = new List<double>();
-                            List<double> listMaxSlopeRAve = new List<double>();
-                            List<double> listSlopeWidthAve = new List<double>();
-                            List<double> listRecirculationAreaAve = new List<double>();
-
-                            List<double> TopHeightAve = new List<double>();
-                            List<double> TopWidthtAve = new List<double>();
-                            List<double> TopTotalAreaAve = new List<double>();
-                            List<double> TopAreaTopAve = new List<double>();
-                            List<double> TopFlatnessAve = new List<double>();
-                            List<double> TopMaxCurvatureAve = new List<double>();
-                            List<double> TopMaxSlopeAve = new List<double>();
-                            List<double> TopMaxSlopeXAve = new List<double>();
-                            List<double> TopMaxSlopeRAve = new List<double>();
-                            List<double> TopSlopeWidthAve = new List<double>();
-                            List<double> TopRecirculationAreaAve = new List<double>();
-
-                            List<double> BottomHeightAve = new List<double>();
-                            List<double> BottomWidthtAve = new List<double>();
-                            List<double> BottomTotalAreaAve = new List<double>();
-                            List<double> BottomAreaTopAve = new List<double>();
-                            List<double> BottomFlatnessAve = new List<double>();
-                            List<double> BottomMaxCurvatureAve = new List<double>();
-                            List<double> BottomMaxSlopeAve = new List<double>();
-                            List<double> BottomMaxSlopeXAve = new List<double>();
-                            List<double> BottomMaxSlopeRAve = new List<double>();
-                            List<double> BottomSlopeWidthAve = new List<double>();
-                            List<double> BottomRecirculationAreaAve = new List<double>();
-                            */
-                            #endregion
-
                             // Save values to their cells
                             for (int index = 0; index < 30; ++index, ++counter)
                             {
                                 string currGeo = currSheet.Cells[counter, 1].Value.ToString();
                                 double[] geoFieldsAverages = _currGroup.AveGeometryFields(currGeo);
 
-                                #region Removed code
-                                /*
-                                // For all 30 tubes
-                                listHeightAve.Add(geoFieldsAverages[0]);
-                                listWidthtAve.Add(geoFieldsAverages[1]);
-                                listTotalAreaAve.Add(geoFieldsAverages[2]);
-                                listAreaTopAve.Add(geoFieldsAverages[3]);
-                                listFlatnessAve.Add(geoFieldsAverages[4]);
-                                listMaxCurvatureAve.Add(geoFieldsAverages[5]);
-                                listMaxSlopeAve.Add(geoFieldsAverages[6]);
-                                listMaxSlopeXAve.Add(geoFieldsAverages[7]);
-                                listMaxSlopeRAve.Add(geoFieldsAverages[8]);
-                                listSlopeWidthAve.Add(geoFieldsAverages[9]);
-                                listRecirculationAreaAve.Add(geoFieldsAverages[10]);
-
-                                if (index < 15)
-                                {
-                                    // For top tubes
-                                    TopHeightAve.Add(geoFieldsAverages[0]);
-                                    TopWidthtAve.Add(geoFieldsAverages[1]);
-                                    TopTotalAreaAve.Add(geoFieldsAverages[2]);
-                                    TopAreaTopAve.Add(geoFieldsAverages[3]);
-                                    TopFlatnessAve.Add(geoFieldsAverages[4]);
-                                    TopMaxCurvatureAve.Add(geoFieldsAverages[5]);
-                                    TopMaxSlopeAve.Add(geoFieldsAverages[6]);
-                                    TopMaxSlopeXAve.Add(geoFieldsAverages[7]);
-                                    TopMaxSlopeRAve.Add(geoFieldsAverages[8]);
-                                    TopSlopeWidthAve.Add(geoFieldsAverages[9]);
-                                    TopRecirculationAreaAve.Add(geoFieldsAverages[10]);
-                                }
-                                else
-                                {
-                                    // For bottom tubes
-                                    BottomHeightAve.Add(geoFieldsAverages[0]);
-                                    BottomWidthtAve.Add(geoFieldsAverages[1]);
-                                    BottomTotalAreaAve.Add(geoFieldsAverages[2]);
-                                    BottomAreaTopAve.Add(geoFieldsAverages[3]);
-                                    BottomFlatnessAve.Add(geoFieldsAverages[4]);
-                                    BottomMaxCurvatureAve.Add(geoFieldsAverages[5]);
-                                    BottomMaxSlopeAve.Add(geoFieldsAverages[6]);
-                                    BottomMaxSlopeXAve.Add(geoFieldsAverages[7]);
-                                    BottomMaxSlopeRAve.Add(geoFieldsAverages[8]);
-                                    BottomSlopeWidthAve.Add(geoFieldsAverages[9]);
-                                    BottomRecirculationAreaAve.Add(geoFieldsAverages[10]);
-                                }
-                                */
-                                #endregion
 
                                 for (int ind = 0, column = 6; ind < geoFieldsAverages.Length; ++ind, column += 2)
                                 {
                                     currSheet.Cells[counter, column].Value = geoFieldsAverages[ind];
 
-                                    #region Removed Code
-                                    /*ave30Tubes[i] += geoFieldsAverages[i];
-                                    if (firstWorksheet.Cells[counter, 3].Value.ToString().ToLower() == "top")
-                                    {
-                                        aveTopTubes[i] += geoFieldsAverages[i];
-                                    }
-                                    else if (firstWorksheet.Cells[counter, 3].Value.ToString().ToLower() == "bottom")
-                                    {
-                                        aveBottomTubes[i] += geoFieldsAverages[i];
-                                    }*/
-                                    #endregion
                                 }
                             }
                         }
                     }
                 }
-
-                #region Removed Code
-                /*
-                // get averages for 30 tubes
-                for (int i = 0; i < ave30Tubes.Length; ++i)
-                {
-                    ave30Tubes[i] = ave30Tubes[i] / 30.0;
-                }
-
-                // get averages for 30 tubes
-                for (int i = 0; i < aveTopTubes.Length; ++i)
-                {
-                    aveTopTubes[i] = aveTopTubes[i] / 15.0;
-                }
-
-                // get averages for 30 tubes
-                for (int i = 0; i < aveBottomTubes.Length; ++i)
-                {
-                    aveBottomTubes[i] = aveBottomTubes[i] / 15.0;
-                }
-
-                // Get standard deviations of each set
-                double[] allStdAverages = new double[11];
-                double[] TopStdAverages = new double[11];
-                double[] BottomStdAverages = new double[11];
-                
-                allStdAverages[0] = CalculateStandardDeviation(listHeightAve);
-                allStdAverages[1] = CalculateStandardDeviation(listWidthtAve);
-                allStdAverages[2] = CalculateStandardDeviation(listTotalAreaAve);
-                allStdAverages[3] = CalculateStandardDeviation(listAreaTopAve);
-                allStdAverages[4] = CalculateStandardDeviation(listFlatnessAve);
-                allStdAverages[5] = CalculateStandardDeviation(listMaxCurvatureAve);
-                allStdAverages[6] = CalculateStandardDeviation(listMaxSlopeAve);
-                allStdAverages[7] = CalculateStandardDeviation(listMaxSlopeXAve);
-                allStdAverages[8] = CalculateStandardDeviation(listMaxSlopeRAve);
-                allStdAverages[9] = CalculateStandardDeviation(listSlopeWidthAve);
-                allStdAverages[10] = CalculateStandardDeviation(listRecirculationAreaAve);
-
-                TopStdAverages[0] = CalculateStandardDeviation(TopHeightAve);
-                TopStdAverages[1] = CalculateStandardDeviation(TopWidthtAve);
-                TopStdAverages[2] = CalculateStandardDeviation(TopTotalAreaAve);
-                TopStdAverages[3] = CalculateStandardDeviation(TopAreaTopAve);
-                TopStdAverages[4] = CalculateStandardDeviation(TopFlatnessAve);
-                TopStdAverages[5] = CalculateStandardDeviation(TopMaxCurvatureAve);
-                TopStdAverages[6] = CalculateStandardDeviation(TopMaxSlopeAve);
-                TopStdAverages[7] = CalculateStandardDeviation(TopMaxSlopeXAve);
-                TopStdAverages[8] = CalculateStandardDeviation(TopMaxSlopeRAve);
-                TopStdAverages[9] = CalculateStandardDeviation(TopSlopeWidthAve);
-                TopStdAverages[10] = CalculateStandardDeviation(TopRecirculationAreaAve);
-
-                BottomStdAverages[0] = CalculateStandardDeviation(BottomHeightAve);
-                BottomStdAverages[1] = CalculateStandardDeviation(BottomWidthtAve);
-                BottomStdAverages[2] = CalculateStandardDeviation(BottomTotalAreaAve);
-                BottomStdAverages[3] = CalculateStandardDeviation(BottomAreaTopAve);
-                BottomStdAverages[4] = CalculateStandardDeviation(BottomFlatnessAve);
-                BottomStdAverages[5] = CalculateStandardDeviation(BottomMaxCurvatureAve);
-                BottomStdAverages[6] = CalculateStandardDeviation(BottomMaxSlopeAve);
-                BottomStdAverages[7] = CalculateStandardDeviation(BottomMaxSlopeXAve);
-                BottomStdAverages[8] = CalculateStandardDeviation(BottomMaxSlopeRAve);
-                BottomStdAverages[9] = CalculateStandardDeviation(BottomSlopeWidthAve);
-                BottomStdAverages[10] = CalculateStandardDeviation(BottomRecirculationAreaAve);
-
-                // Insert averages and std
-                for (int i = 0, col = 3; i < 11; ++i, col += 2)
-                {
-                    // 30 Tubes Mean then std
-                    firstWorksheet.Cells[11, col].Value = ave30Tubes[i]; 
-                    firstWorksheet.Cells[12, col].Value = allStdAverages[i];
-                    // Top Tubes Mean then std
-                    firstWorksheet.Cells[13, col].Value = aveTopTubes[i]; 
-                    firstWorksheet.Cells[14, col].Value = TopStdAverages[i]; 
-                    // Bottom tubes Mean then std
-                    firstWorksheet.Cells[15, col].Value = aveBottomTubes[i]; 
-                    firstWorksheet.Cells[16, col].Value = BottomStdAverages[i];
-                }
-                */
-                #endregion
 
                 // Save the changes
                 try
@@ -424,19 +293,6 @@ namespace ExcelWorkerCalla
                 }
             }
 
-            #region Test Code
-/*            // **************** Test code **********************************
-            using (StreamWriter sw = new StreamWriter(@"C:\Users\kflor\OneDrive\Desktop\Averages.txt"))
-            {
-                // Enter required data to textfile
-                foreach (Ball ball in _currGroup.balls)
-                {
-                    sw.Write(ball.ToString());
-                    sw.WriteLine();
-                }
-            }
-            // **************** End test code *******************************/
-            #endregion
         }
 
         private static void ParseInputFile(FileInfo file)
@@ -447,7 +303,7 @@ namespace ExcelWorkerCalla
             {
                 // _groupNumbers
                 // Get first worksheet to grab data from
-                ExcelWorksheet rackOneAndTwo = excelDoc.Workbook.Worksheets[1];
+                ExcelWorksheet rackOneAndTwo = excelDoc.Workbook.Worksheets.FirstOrDefault();
 
                 // Rack 1
                 AnalyzeSection(rackOneAndTwo, 3, 1, 10, 3);
@@ -572,7 +428,7 @@ namespace ExcelWorkerCalla
                             gd.geoType = firstWorksheet.Cells[currLine, 5].Value.ToString();
 
                             // Try to parse an integer values from Icosahedron field
-                            if (int.TryParse(firstWorksheet.Cells[currLine, 4].Value.ToString(), out int rslt))
+                            if (firstWorksheet.Cells[currLine, 4].Value != null && int.TryParse(firstWorksheet.Cells[currLine, 4].Value.ToString(), out int rslt))
                             {
                                 gd.icosahedron = rslt;
                             }
@@ -583,7 +439,7 @@ namespace ExcelWorkerCalla
 
                             #region Try parse the rest of the fields as double values
                             // Height
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 6].Value.ToString(), out double height))
+                            if (firstWorksheet.Cells[currLine, 6].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 6].Value.ToString(), out double height))
                             {
                                 gd.height = height;
                             }
@@ -592,7 +448,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Height from sheet for ball number: {ballNum}");
                             }
                             // Width
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 7].Value.ToString(), out double width))
+                            if (firstWorksheet.Cells[currLine, 7].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 7].Value.ToString(), out double width))
                             {
                                 gd.width = width;
                             }
@@ -601,7 +457,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Width from sheet for ball number: {ballNum}");
                             }
                             // Total Area
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 8].Value.ToString(), out double totalArea))
+                            if (firstWorksheet.Cells[currLine, 8].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 8].Value.ToString(), out double totalArea))
                             {
                                 gd.totalArea = totalArea;
                             }
@@ -610,7 +466,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Total Area from sheet for ball number: {ballNum}");
                             }
                             // Area Top
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 9].Value.ToString(), out double areaTop))
+                            if (firstWorksheet.Cells[currLine, 9].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 9].Value.ToString(), out double areaTop))
                             {
                                 gd.areaTop = areaTop;
                             }
@@ -619,7 +475,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Area Top from sheet for ball number: {ballNum}");
                             }
                             // Flatness
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 10].Value.ToString(), out double flatness))
+                            if (firstWorksheet.Cells[currLine, 10].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 10].Value.ToString(), out double flatness))
                             {
                                 gd.flatness = flatness;
                             }
@@ -628,7 +484,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Flatness from sheet for ball number: {ballNum}");
                             }
                             // Max curvature
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 11].Value.ToString(), out double curvature))
+                            if (firstWorksheet.Cells[currLine, 11].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 11].Value.ToString(), out double curvature))
                             {
                                 gd.maxCurvature = curvature;
                             }
@@ -637,7 +493,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Max curvature from sheet for ball number: {ballNum}");
                             }
                             // Max Slope Average
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 12].Value.ToString(), out double slopeAve))
+                            if (firstWorksheet.Cells[currLine, 12].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 12].Value.ToString(), out double slopeAve))
                             {
                                 gd.maxSlopeAve = slopeAve;
                             }
@@ -646,7 +502,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Max Slope Average from sheet for ball number: {ballNum}");
                             }
                             // Max Slope X Average
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 13].Value.ToString(), out double slopeXAve))
+                            if (firstWorksheet.Cells[currLine, 13].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 13].Value.ToString(), out double slopeXAve))
                             {
                                 gd.maxSlopeXAve = slopeXAve;
                             }
@@ -655,7 +511,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Max Slope X Average from sheet for ball number: {ballNum}");
                             }
                             // Max Slope R Average
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 14].Value.ToString(), out double slopeRAve))
+                            if (firstWorksheet.Cells[currLine, 14].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 14].Value.ToString(), out double slopeRAve))
                             {
                                 gd.maxSlopeRAve = slopeRAve;
                             }
@@ -664,7 +520,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Max Slope R Average from sheet for ball number: {ballNum}");
                             }
                             // Slope Width
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 15].Value.ToString(), out double slopeWidth))
+                            if (firstWorksheet.Cells[currLine, 15].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 15].Value.ToString(), out double slopeWidth))
                             {
                                 gd.slopeWidth = slopeWidth;
                             }
@@ -673,7 +529,7 @@ namespace ExcelWorkerCalla
                                 _log.Error($"Failed to parse Slope Width from sheet for ball number: {ballNum}");
                             }
                             // Recirculation area average
-                            if (double.TryParse(firstWorksheet.Cells[currLine, 16].Value.ToString(), out double recirc))
+                            if (firstWorksheet.Cells[currLine, 16].Value != null && double.TryParse(firstWorksheet.Cells[currLine, 16].Value.ToString(), out double recirc))
                             {
                                 gd.recirculationAreaAve = recirc;
                             }
